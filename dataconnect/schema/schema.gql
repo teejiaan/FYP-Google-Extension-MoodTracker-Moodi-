@@ -1,0 +1,40 @@
+type User @table {
+  createdAt: Timestamp!
+  extensionId: String!
+  lastActivityAnalysisDate: Timestamp
+  moodTrackingEnabled: Boolean
+}
+
+type ActivityRecord @table {
+  user: User!
+  timestamp: Timestamp!
+  activityType: String!
+  durationSeconds: Int!
+  domain: String
+  searchKeywords: String
+}
+
+type MoodInsight @table {
+  user: User!
+  date: Date!
+  inferredMoodScore: Float!
+  createdAt: Timestamp!
+  moodCategory: String
+  keyIndicators: String
+}
+
+type UserNote @table {
+  user: User!
+  date: Date!
+  noteContent: String!
+  createdAt: Timestamp!
+  associatedMoodInsight: MoodInsight
+}
+
+type Setting @table {
+  user: User!
+  settingName: String!
+  settingValue: String!
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
