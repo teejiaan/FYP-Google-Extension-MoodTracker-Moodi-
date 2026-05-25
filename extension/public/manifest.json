@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "Moodi Mental State Monitor",
+  "version": "1.0.0",
+  "description": "Tracks browsing patterns to provide wellness insights.",
+
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "idle",
+    "scripting",
+    "identity"
+  ],
+
+  "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-scripts/observer.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["openid", "email", "profile"]
+  }
+}
