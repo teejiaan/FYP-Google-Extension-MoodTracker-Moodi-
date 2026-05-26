@@ -9,7 +9,7 @@ export default defineConfig({
         emptyOutDir: true,
         rollupOptions: {
             input: {
-                popup: resolve(__dirname, "popup/index.html"),
+                popup: resolve(__dirname, "src/popup/index.html"),
                 background: resolve(__dirname, "src/background/service-worker.ts"),
                 observer: resolve(__dirname, "src/content-scripts/observer.ts"),
             },

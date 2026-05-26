@@ -5,6 +5,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../shared/firebase";
 import { SiteVisit, SessionMetrics, SiteCategory } from "../shared/types";
+import { classifyUrl } from "./url-classifier";
 
 // ─── In-memory state ──────────────────────────────────────────────────────────
 
@@ -89,7 +90,6 @@ function closeSiteVisit(url: string, endMs: number) {
 }
 
 function buildVisit(url: string, startMs: number, endMs: number): SiteVisit {
-  const { classifyUrl } = require("./url-classifier");
   return {
     url,
     hostname: new URL(url).hostname.replace(/^www\./, ""),
@@ -98,6 +98,7 @@ function buildVisit(url: string, startMs: number, endMs: number): SiteVisit {
     startedAt: startMs,
   };
 }
+
 
 function buildMetrics(visits: SiteVisit[], now: number): SessionMetrics {
   const totalActiveMs = now - sessionStartMs - pageSignals.idleMs;
