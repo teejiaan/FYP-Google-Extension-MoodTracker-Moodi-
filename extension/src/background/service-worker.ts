@@ -16,7 +16,8 @@ let lastPageSignalTs = Date.now();
 
 /** Fires when the user switches to a different tab. */
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
-  const tab = await chrome.tabs.get(tabId);
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  if (!tab) return;
   if (!tab.url || tab.url.startsWith("chrome://")) return;
 
   recordTabSwitch(previousUrl, tab.url);
@@ -67,9 +68,7 @@ chrome.runtime.onMessage.addListener(
         break;
       }
     }
-
-    // Return true to keep the message channel open for async sendResponse
-    return true;
+    return false;
   }
 );
 

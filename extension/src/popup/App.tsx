@@ -33,7 +33,7 @@ export default function App() {
   return (
     <div className="popup-root">
       <header className="popup-header">
-        <span className="logo">𝗠𝗶𝗻𝗱𝗘𝘅𝘁</span>
+        <span className="logo">Moodi</span>
         <img src={user.photoURL ?? ""} className="avatar" alt={user.displayName ?? ""} />
       </header>
 
