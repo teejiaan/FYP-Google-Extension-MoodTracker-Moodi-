@@ -2,6 +2,7 @@ import { ExtensionMessage, PageSignal } from "../shared/types";
 import {
   recordTabSwitch,
   recordPageSignal,
+  recordOpenTabCount,
   getSessionMetrics,
   flushSession,
   startFlushTimer,
@@ -12,25 +13,56 @@ import {
 let previousUrl = "";
 let lastPageSignalTs = Date.now();
 
+function isTrackableUrl(url?: string) {
+  return Boolean(url) && !url!.startsWith("chrome://") && !url!.startsWith("edge://");
+}
+
+async function updateOpenTabCount() {
+  const tabs = await chrome.tabs.query({}).catch(() => []);
+  recordOpenTabCount(tabs.length);
+}
+
+async function seedActiveTab() {
+  const [tab] = await chrome.tabs
+    .query({ active: true, currentWindow: true })
+    .catch(() => []);
+
+  if (!isTrackableUrl(tab?.url)) return;
+
+  recordTabSwitch("", tab!.url!);
+  previousUrl = tab!.url!;
+}
+
 // ─── Tab event listeners ──────────────────────────────────────────────────────
 
 /** Fires when the user switches to a different tab. */
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  updateOpenTabCount();
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (!tab) return;
-  if (!tab.url || tab.url.startsWith("chrome://")) return;
+  const url = tab.url;
+  if (!url || !isTrackableUrl(url)) return;
 
-  recordTabSwitch(previousUrl, tab.url);
-  previousUrl = tab.url;
+  recordTabSwitch(previousUrl, url);
+  previousUrl = url;
 });
 
 /** Fires when a tab navigates to a new URL. */
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
-  if (!tab.active || !tab.url || tab.url.startsWith("chrome://")) return;
+  updateOpenTabCount();
+  if (!tab.active || !isTrackableUrl(tab.url)) return;
 
-  recordTabSwitch(previousUrl, tab.url);
-  previousUrl = tab.url;
+  recordTabSwitch(previousUrl, tab.url!);
+  previousUrl = tab.url!;
+});
+
+chrome.tabs.onCreated.addListener(() => {
+  updateOpenTabCount();
+});
+
+chrome.tabs.onRemoved.addListener(() => {
+  updateOpenTabCount();
 });
 
 /** Flush before the browser closes. */
@@ -75,4 +107,6 @@ chrome.runtime.onMessage.addListener(
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 startFlushTimer();
+updateOpenTabCount();
+seedActiveTab();
 console.log("[MindExt] Service worker started.");

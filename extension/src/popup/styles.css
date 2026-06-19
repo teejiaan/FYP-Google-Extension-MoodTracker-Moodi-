@@ -88,6 +88,124 @@ textarea {
     min-height: 360px;
 }
 
+.today-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tracking-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.metric-grid .metric-card:last-child {
+    grid-column: 1 / -1;
+}
+
+.metric-card {
+    min-height: 74px;
+    padding: 12px;
+    border: 1px solid #d8e0e8;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.metric-card-primary {
+    min-height: 92px;
+    background: #e9f7f5;
+    border-color: #b9e2dc;
+}
+
+.metric-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #667085;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.metric-card strong {
+    color: #172033;
+    font-size: 22px;
+    line-height: 1.1;
+}
+
+.metric-card-primary strong {
+    font-size: 34px;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.section-heading h2 {
+    margin: 0;
+    color: #172033;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.site-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.site-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 50px;
+    padding: 10px 12px;
+    border: 1px solid #d8e0e8;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+.site-row div {
+    min-width: 0;
+}
+
+.site-row strong {
+    display: block;
+    max-width: 190px;
+    overflow: hidden;
+    color: #172033;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.site-row span {
+    color: #667085;
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.site-row > span {
+    flex: 0 0 auto;
+    text-transform: none;
+}
+
+.muted-text {
+    margin: 0;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
 .signin-container {
     display: flex;
     flex-direction: column;
@@ -348,6 +466,14 @@ textarea {
     margin: 0;
     color: #667085;
     line-height: 1.45;
+}
+
+.score-empty {
+    gap: 6px;
+}
+
+.score-empty strong {
+    color: #172033;
 }
 
 .success-overlay {

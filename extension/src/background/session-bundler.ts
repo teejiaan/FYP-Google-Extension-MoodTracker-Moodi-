@@ -11,6 +11,7 @@ import { classifyUrl } from "./url-classifier";
 
 let sessionStartMs = Date.now();
 let tabSwitches = 0;
+let openTabCount = 0;
 let currentSiteStart = Date.now();
 let currentUrl = "";
 const siteVisits: SiteVisit[] = [];
@@ -38,6 +39,11 @@ export function recordTabSwitch(fromUrl: string, toUrl: string) {
 /** Called by service worker when a page signal arrives from content script. */
 export function recordPageSignal(idleDeltaMs: number) {
   pageSignals.idleMs += idleDeltaMs;
+}
+
+/** Called by service worker when the browser tab count changes. */
+export function recordOpenTabCount(count: number) {
+  openTabCount = count;
 }
 
 /** Computes and returns current session metrics without flushing. */
@@ -112,6 +118,7 @@ function buildMetrics(visits: SiteVisit[], now: number): SessionMetrics {
 
   return {
     tabSwitches,
+    openTabCount,
     totalActiveMs: Math.max(0, totalActiveMs),
     idleMs: pageSignals.idleMs,
     sites: visits,

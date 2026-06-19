@@ -19,6 +19,7 @@ export interface SiteVisit {
 
 export interface SessionMetrics {
   tabSwitches: number;
+  openTabCount: number;
   totalActiveMs: number;
   idleMs: number;
   sites: SiteVisit[];
