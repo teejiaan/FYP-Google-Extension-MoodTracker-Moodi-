@@ -64,7 +64,7 @@ chrome.runtime.onMessage.addListener(
 
       case "AUTH_TOKEN_READY": {
         // Token stored in auth module via signInWithCredential — nothing extra needed
-        console.log("[MindExt] Auth token received, Firestore writes enabled.");
+        console.log("[Moodi] Auth token received, Firestore writes enabled.");
         break;
       }
     }
@@ -75,4 +75,4 @@ chrome.runtime.onMessage.addListener(
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 startFlushTimer();
-console.log("[MindExt] Service worker started.");
+console.log("[Moodi] Service worker started.");

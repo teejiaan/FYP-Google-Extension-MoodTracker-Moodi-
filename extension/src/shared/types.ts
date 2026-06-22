@@ -31,7 +31,7 @@ export interface Session {
   startedAt: number;     // epoch ms
   endedAt: number;
   metrics: SessionMetrics;
-  mentalStateScore?: number;  // 0–100, written by Cloud Function
+  mentalStateScore?: number;  // 0-100, calculated when the session is saved
   diagnosis?: string;         // short text label e.g. "Focused", "Scattered"
 }
 
