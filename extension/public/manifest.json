@@ -1,6 +1,5 @@
 {
   "manifest_version": 3,
-  "key": "cghokbagmehhfgmebblchkhejoflfkje",
   "name": "Moodi Mental State Monitor",
   "version": "1.0.0",
   "description": "Tracks browsing patterns to provide wellness insights.",
@@ -34,7 +33,7 @@
     "default_popup": "src/popup/index.html"
   },
   "oauth2": {
-    "client_id": "32586665803-u2bd8prqus31kk7ko6sbt5ac0g88arba.apps.googleusercontent.com",
+    "client_id": "32586665803-tn65mfl7f012toa6nglbcjkplaga9ql7.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",

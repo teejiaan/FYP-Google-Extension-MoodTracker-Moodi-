@@ -13,6 +13,36 @@ const CATEGORY_MAP: Record<string, SiteCategory> = {
   "docs.google.com": "productive",
   "stackoverflow.com": "productive",
   "jira.atlassian.com": "productive",
+  "scholar.google.com": "productive",
+  "researchgate.net": "productive",
+  "semanticscholar.org": "productive",
+  "arxiv.org": "productive",
+  "ieee.org": "productive",
+  "ieeexplore.ieee.org": "productive",
+  "acm.org": "productive",
+  "dl.acm.org": "productive",
+  "sciencedirect.com": "productive",
+  "springer.com": "productive",
+  "springerlink.com": "productive",
+  "link.springer.com": "productive",
+  "jstor.org": "productive",
+  "tandfonline.com": "productive",
+  "wiley.com": "productive",
+  "onlinelibrary.wiley.com": "productive",
+  "mdpi.com": "productive",
+  "frontiersin.org": "productive",
+  "nature.com": "productive",
+  "science.org": "productive",
+  "pubmed.ncbi.nlm.nih.gov": "productive",
+  "ncbi.nlm.nih.gov": "productive",
+  "plos.org": "productive",
+  "sagepub.com": "productive",
+  "cambridge.org": "productive",
+  "oup.com": "productive",
+  "oxfordacademic.com": "productive",
+  "orcid.org": "productive",
+  "mendeley.com": "productive",
+  "zotero.org": "productive",
 
   // Social
   "twitter.com": "social",
@@ -48,6 +78,17 @@ const CATEGORY_MAP: Record<string, SiteCategory> = {
   "developer.mozilla.org": "reference",
   "medium.com": "reference",
   "dev.to": "reference",
+  "britannica.com": "reference",
+  "dictionary.com": "reference",
+  "merriam-webster.com": "reference",
+  "quora.com": "reference",
+  "geeksforgeeks.org": "reference",
+  "w3schools.com": "reference",
+  "tutorialspoint.com": "reference",
+  "khanacademy.org": "reference",
+  "coursera.org": "reference",
+  "edx.org": "reference",
+  "udemy.com": "reference",
 };
 
 /**
@@ -79,5 +120,20 @@ export function classifyUrl(url: string): SiteCategory {
     if (hostname.endsWith(domain)) return category;
   }
 
+  if (isAcademicHostname(hostname)) return "productive";
+
   return "other";
+}
+
+function isAcademicHostname(hostname: string): boolean {
+  return (
+    hostname.endsWith(".edu") ||
+    hostname.endsWith(".edu.my") ||
+    hostname.endsWith(".edu.au") ||
+    hostname.endsWith(".ac.uk") ||
+    hostname.endsWith(".ac.jp") ||
+    hostname.endsWith(".ac.kr") ||
+    hostname.endsWith(".ac.id") ||
+    hostname.endsWith(".edu.sg")
+  );
 }
