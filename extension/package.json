@@ -1,6 +1,8 @@
 {
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && npm run sync:chrome",
+    "build:dist": "vite build",
+    "sync:chrome": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/sync-chrome-extension.ps1",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -13,6 +13,28 @@ const CATEGORY_MAP: Record<string, SiteCategory> = {
   "docs.google.com": "productive",
   "stackoverflow.com": "productive",
   "jira.atlassian.com": "productive",
+  "chatgpt.com": "productive",
+  "openai.com": "productive",
+  "claude.ai": "productive",
+  "anthropic.com": "productive",
+  "gemini.google.com": "productive",
+  "perplexity.ai": "productive",
+  "poe.com": "productive",
+  "copilot.microsoft.com": "productive",
+  "github.copilot.com": "productive",
+  "copilot.github.com": "productive",
+  "cursor.com": "productive",
+  "cursor.sh": "productive",
+  "v0.dev": "productive",
+  "bolt.new": "productive",
+  "lovable.dev": "productive",
+  "notebooklm.google.com": "productive",
+  "deepseek.com": "productive",
+  "you.com": "productive",
+  "phind.com": "productive",
+  "writesonic.com": "productive",
+  "grammarly.com": "productive",
+  "quillbot.com": "productive",
   "scholar.google.com": "productive",
   "researchgate.net": "productive",
   "semanticscholar.org": "productive",
@@ -112,6 +134,8 @@ export function classifyUrl(url: string): SiteCategory {
   const hostname = getRootHostname(url);
   if (!hostname) return "other";
 
+  if (isPdfUrl(url)) return "reference";
+
   // Exact match first
   if (CATEGORY_MAP[hostname]) return CATEGORY_MAP[hostname];
 
@@ -123,6 +147,18 @@ export function classifyUrl(url: string): SiteCategory {
   if (isAcademicHostname(hostname)) return "productive";
 
   return "other";
+}
+
+function isPdfUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.pathname.toLowerCase().endsWith(".pdf") ||
+      parsed.search.toLowerCase().includes(".pdf")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isAcademicHostname(hostname: string): boolean {

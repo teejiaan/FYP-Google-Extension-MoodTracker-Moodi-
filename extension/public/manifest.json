@@ -9,8 +9,25 @@
     "storage",
     "idle",
     "scripting",
-    "identity"
+    "identity",
+    "windows",
+    "alarms"
   ],
+  "icons": {
+    "16": "icons/moodi-logo.png",
+    "32": "icons/moodi-logo.png",
+    "48": "icons/moodi-logo.png",
+    "128": "icons/moodi-logo.png"
+  },
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icons/moodi-logo.png",
+      "32": "icons/moodi-logo.png",
+      "48": "icons/moodi-logo.png",
+      "128": "icons/moodi-logo.png"
+    }
+  },
   "host_permissions": [
     "<all_urls>"
   ],
@@ -29,11 +46,8 @@
       "run_at": "document_idle"
     }
   ],
-  "action": {
-    "default_popup": "src/popup/index.html"
-  },
   "oauth2": {
-    "client_id": "32586665803-tn65mfl7f012toa6nglbcjkplaga9ql7.apps.googleusercontent.com",
+    "client_id": "32586665803-7pkkjiotsbbts4nbh7pkmmgj894u2s1l.apps.googleusercontent.com",
     "scopes": [
       "openid",
       "email",
