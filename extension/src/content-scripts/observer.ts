@@ -101,9 +101,9 @@ function showIdleOverlay(idleMinutes: number) {
     "display: grid",
     "place-items: center",
     "padding: 24px",
-    "background: rgba(120, 86, 0, 0.12)",
-    "backdrop-filter: blur(6px)",
-    "-webkit-backdrop-filter: blur(6px)",
+    "background: rgba(23, 32, 51, 0.28)",
+    "backdrop-filter: blur(8px)",
+    "-webkit-backdrop-filter: blur(8px)",
     "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
   ].join(";");
 
@@ -111,10 +111,10 @@ function showIdleOverlay(idleMinutes: number) {
   card.style.cssText = [
     "width: min(430px, calc(100vw - 48px))",
     "padding: 22px",
-    "border: 1px solid rgba(255, 230, 150, 0.72)",
+    "border: 1px solid rgba(255, 230, 150, 0.88)",
     "border-radius: 30px",
-    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.92), transparent 38%), linear-gradient(145deg, rgba(255, 250, 232, 0.88), rgba(255, 242, 191, 0.66), rgba(255, 255, 255, 0.54))",
-    "box-shadow: 0 28px 80px rgba(84, 58, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.92)",
+    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(255, 252, 239, 0.96), rgba(255, 244, 204, 0.9), rgba(255, 255, 255, 0.86))",
+    "box-shadow: 0 30px 90px rgba(0, 0, 0, 0.36), 0 0 0 1px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
     "color: #172033",
     "text-align: center",
     "backdrop-filter: blur(24px) saturate(1.22)",
@@ -134,7 +134,7 @@ function showIdleOverlay(idleMinutes: number) {
   const message = document.createElement("p");
   message.textContent = `Moodi has detected about ${idleMinutes} minutes of continuous inactivity. Move around, stretch, or resume when you're ready.`;
   message.style.cssText =
-    "margin:0 0 18px;color:#667085;font-size:14px;line-height:1.5;";
+    "margin:0 0 18px;color:#3f4a5f;font-size:14px;line-height:1.5;";
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
@@ -160,10 +160,10 @@ function showRecommendationOverlay(title: string, message: string) {
     "z-index: 2147483647",
     "width: min(390px, calc(100vw - 48px))",
     "padding: 0",
-    "border: 1px solid rgba(255, 255, 255, 0.72)",
+    "border: 1px solid rgba(255, 255, 255, 0.92)",
     "border-radius: 30px",
-    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.92), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(236, 248, 246, 0.54) 52%, rgba(222, 239, 255, 0.4))",
-    "box-shadow: 0 28px 80px rgba(23, 32, 51, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(236, 248, 246, 0.9) 52%, rgba(226, 242, 255, 0.86))",
+    "box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
     "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
     "color: #172033",
     "overflow: hidden",
@@ -181,7 +181,7 @@ function showRecommendationOverlay(title: string, message: string) {
   const badge = document.createElement("div");
   badge.textContent = "M";
   badge.style.cssText =
-    "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.9), rgba(255, 255, 255, 0.62), rgba(222, 239, 255, 0.38));color:#2f9e8f;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.82);";
+    "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.88), rgba(222, 239, 255, 0.72));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
 
   const content = document.createElement("div");
   content.style.cssText = "min-width:0;flex:1;padding-top:1px;";
@@ -189,7 +189,7 @@ function showRecommendationOverlay(title: string, message: string) {
   const eyebrow = document.createElement("div");
   eyebrow.textContent = "Moodi";
   eyebrow.style.cssText =
-    "margin:0 0 5px;font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#2f9e8f;";
+    "margin:0 0 5px;font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#237b70;";
 
   const titleEl = document.createElement("div");
   titleEl.textContent = title;
@@ -199,14 +199,14 @@ function showRecommendationOverlay(title: string, message: string) {
   const messageEl = document.createElement("div");
   messageEl.textContent = message;
   messageEl.style.cssText =
-    "margin:0;font-size:13px;line-height:1.5;color:#667085;";
+    "margin:0;font-size:13px;line-height:1.5;color:#3f4a5f;";
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.textContent = "x";
   closeButton.setAttribute("aria-label", "Dismiss Moodi recommendation");
   closeButton.style.cssText =
-    "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(255, 255, 255, 0.72);border-radius:999px;background:rgba(255, 255, 255, 0.48);color:#667085;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:inset 0 1px 0 rgba(255, 255, 255, 0.72);";
+    "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.1);border-radius:999px;background:rgba(255, 255, 255, 0.78);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 6px 14px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.88);";
   closeButton.addEventListener("click", () => overlay.remove());
 
   content.append(eyebrow, titleEl, messageEl);

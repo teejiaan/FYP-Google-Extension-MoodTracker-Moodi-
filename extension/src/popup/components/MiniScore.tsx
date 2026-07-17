@@ -176,7 +176,7 @@ function getRecommendation(metrics: SessionMetrics, dailyFocus: DailyFocus) {
   ) {
     return {
       title: "Plan a short break soon",
-      body: "You have crossed about an hour of focused activity. A 10 minute pause can help protect attention and reduce fatigue.",
+      body: "You are building a focused work stretch. A 10 minute pause later can help protect attention and reduce fatigue.",
       tone: "rest",
     };
   }

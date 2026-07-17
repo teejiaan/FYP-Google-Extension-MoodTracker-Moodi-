@@ -4,6 +4,7 @@ import { auth, db } from "../../shared/firebase";
 import { signOutUser } from "../../shared/auth";
 import { ExtensionMessage } from "../../shared/types";
 import {
+  CONSENT_ACCEPTED_KEY,
   OVERLAY_ENABLED_KEY,
   TRACKING_ENABLED_KEY,
   getMoodiSettings,
@@ -14,7 +15,11 @@ const DASHBOARD_URL = "https://moodi-aea62.web.app";
 const STAR_OPTIONS = [1, 2, 3, 4, 5];
 type FeedbackType = (typeof FEEDBACK_TYPES)[number];
 
-export default function Settings() {
+interface SettingsProps {
+  onShowConsent: () => Promise<void>;
+}
+
+export default function Settings({ onShowConsent }: SettingsProps) {
   const [trackingEnabled, setTrackingEnabled] = useState(true);
   const [overlayEnabled, setOverlayEnabled] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
@@ -67,6 +72,11 @@ export default function Settings() {
 
   function openDashboard() {
     chrome.tabs.create({ url: DASHBOARD_URL });
+  }
+
+  async function showPrivacyNotice() {
+    await chrome.storage.local.set({ [CONSENT_ACCEPTED_KEY]: false });
+    await onShowConsent();
   }
 
   async function handleSignOut() {
@@ -168,6 +178,10 @@ export default function Settings() {
 
       <button type="button" className="settings-action" onClick={resetCurrentSession}>
         Reset current session
+      </button>
+
+      <button type="button" className="settings-action" onClick={showPrivacyNotice}>
+        View privacy notice
       </button>
 
       <button

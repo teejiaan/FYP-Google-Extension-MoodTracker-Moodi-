@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { User } from "firebase/auth";
 import { onAuth } from "../shared/auth";
 import SignIn from "./components/SignIn";
+import ConsentNotice from "./components/ConsentNotice";
 import MiniScore from "./components/MiniScore";
 import MoodCheckIn from "./components/MoodCheckIn";
 import Settings from "./components/Settings";
 import History from "./components/History";
 import { DailyFocus } from "../shared/types";
+import { CONSENT_ACCEPTED_KEY } from "../shared/settings";
 
 type View = "score" | "history" | "mood" | "settings";
 
@@ -23,9 +25,23 @@ const CURRENT_FOCUS_KEY = "moodiCurrentDailyFocus";
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [consentAccepted, setConsentAccepted] = useState<boolean | null>(null);
   const [focusLoading, setFocusLoading] = useState(false);
   const [dailyFocus, setDailyFocus] = useState<DailyFocus | null>(null);
   const [view, setView] = useState<View>("score");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    chrome.storage.local.get(CONSENT_ACCEPTED_KEY).then((stored) => {
+      if (cancelled) return;
+      setConsentAccepted(stored[CONSENT_ACCEPTED_KEY] === true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const unsub = onAuth((u) => {
@@ -81,13 +97,25 @@ export default function App() {
     setDailyFocus(focus);
   }
 
-  if (loading) {
+  async function handleConsentAccept() {
+    await chrome.storage.local.set({ [CONSENT_ACCEPTED_KEY]: true });
+    setConsentAccepted(true);
+  }
+
+  async function showConsentNotice() {
+    await chrome.storage.local.set({ [CONSENT_ACCEPTED_KEY]: false });
+    setConsentAccepted(false);
+  }
+
+  if (loading || consentAccepted === null) {
     return (
       <div className="popup-loading">
         <span className="pulse-dot" />
       </div>
     );
   }
+
+  if (!consentAccepted) return <ConsentNotice onAccept={handleConsentAccept} />;
 
   if (!user) return <SignIn />;
 
@@ -163,7 +191,7 @@ export default function App() {
         ) : view === "mood" ? (
           <MoodCheckIn uid={user.uid} />
         ) : (
-          <Settings />
+          <Settings onShowConsent={showConsentNotice} />
         )}
       </main>
     </div>

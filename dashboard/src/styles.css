@@ -113,14 +113,15 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  min-height: 44px;
+  min-height: 52px;
   border: 1px solid rgba(23, 32, 51, 0.12);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
   color: #172033;
   font-weight: 800;
+  font-size: 15px;
   box-shadow: 0 10px 24px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
@@ -131,12 +132,20 @@ button {
 }
 
 .google-auth-button svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   flex: 0 0 auto;
 }
 
-.login-bubble span {
+.google-auth-button span {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  line-height: 1;
+}
+
+.login-bubble > span {
   display: block;
   margin-top: 12px;
   color: #667085;

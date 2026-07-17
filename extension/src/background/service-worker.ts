@@ -25,7 +25,7 @@ let idleOverlayShown = false;
 const CURRENT_FOCUS_KEY = "moodiCurrentDailyFocus";
 const LAST_NOTIFICATION_KEY = "moodiLastRecommendationNotification";
 const NOTIFICATION_ALARM_NAME = "moodiRecommendationCheck";
-// Demo timing for documentation screenshots. Revert after capturing screenshots.
+// Temporary screenshot timing. Keep the short reminder interval while documenting.
 const NOTIFICATION_CHECK_INTERVAL_MS = 30 * 1000;
 const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000;
 const SLEEP_SIGNAL_GAP_MS = 5 * 60 * 1000;
@@ -187,27 +187,27 @@ function getNotificationRecommendation(
   if (focus === "academic" && activeMinutes >= 5 && productiveRatio >= 0.55) {
     return {
       id: "academic-long-reset",
-      title: "Time for a 15 minute reset",
+      title: "Take a focused reset",
       message:
-        "You have been in a long research or work stretch. Step away, hydrate, and rest your eyes.",
+        "You have been in a steady research or work stretch. Step away for a few minutes, hydrate, and rest your eyes.",
     };
   }
 
   if (focus === "academic" && activeMinutes >= 3 && productiveRatio >= 0.55) {
     return {
       id: "academic-short-break",
-      title: "Plan a short break soon",
+      title: "Keep your pace sustainable",
       message:
-        "You have crossed about an hour of focused activity. A 10 minute pause can help protect your attention.",
+        "Your session is becoming a focused work block. Consider a short pause soon so your attention stays fresh.",
     };
   }
 
   if (focus === "academic" && tabSwitchesPerHour >= 30 && metrics.tabSwitches >= 6) {
     return {
       id: "academic-context-switching",
-      title: "Reduce context switching",
+      title: "Reduce tab switching",
       message:
-        "Your tab switching is high. Try closing unused tabs and finishing one task before moving on.",
+        "Your switching pattern is getting scattered. Close unused tabs and choose one task to finish next.",
     };
   }
 
@@ -216,16 +216,16 @@ function getNotificationRecommendation(
       id: "academic-distraction",
       title: "Check your intention",
       message:
-        "Social or entertainment browsing is taking a noticeable share of your academic/work session.",
+        "Social or entertainment browsing is taking a noticeable share of this academic/work session.",
     };
   }
 
   if (focus === "casual" && activeMinutes >= 5 && distractionRatio >= 0.45) {
     return {
       id: "casual-long-break",
-      title: "Take a quick pause",
+      title: "Pause and check in",
       message:
-        "This is becoming a longer casual browsing stretch. A short break can keep it restorative.",
+        "This casual browsing stretch is getting longer. A quick pause can help keep it restorative.",
     };
   }
 
@@ -234,16 +234,16 @@ function getNotificationRecommendation(
       id: "academic-demo-general",
       title: "Time for a short reset",
       message:
-        "You have been active for a few minutes in academic/work mode. This demo reminder can be used for documentation.",
+        "You have been active in academic/work mode for a while. Take a brief reset before continuing.",
     };
   }
 
   if (focus === "casual" && activeMinutes >= 5) {
     return {
       id: "casual-demo-general",
-      title: "Take a quick pause",
+      title: "Take a mindful pause",
       message:
-        "You have been casually browsing for a few minutes. This demo reminder can be used for documentation.",
+        "You have been casually browsing for a while. Pause briefly and decide whether you want to continue.",
     };
   }
 
@@ -255,14 +255,14 @@ function getFocusConfirmationOverlay(focus: DailyFocus) {
     return {
       title: "Academic mode is active",
       message:
-        "Moodi will show recommendations here when your research or work session gets long, scattered, or needs a reset.",
+        "Moodi will show gentle reminders here when your research or work session becomes long, scattered, or tiring.",
     };
   }
 
   return {
     title: "Casual mode is active",
     message:
-      "Moodi will show recommendations here when casual browsing starts running long or could use a quick pause.",
+      "Moodi will show gentle reminders here when casual browsing starts running long or may need a pause.",
   };
 }
 
@@ -349,10 +349,10 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
         "z-index: 2147483647",
         "width: min(390px, calc(100vw - 48px))",
         "padding: 0",
-        "border: 1px solid rgba(255, 255, 255, 0.72)",
+        "border: 1px solid rgba(255, 255, 255, 0.92)",
         "border-radius: 30px",
-        "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.92), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(236, 248, 246, 0.54) 52%, rgba(222, 239, 255, 0.4))",
-        "box-shadow: 0 28px 80px rgba(23, 32, 51, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.9)",
+        "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(236, 248, 246, 0.9) 52%, rgba(226, 242, 255, 0.86))",
+        "box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
         "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
         "color: #172033",
         "overflow: hidden",
@@ -370,7 +370,7 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
       const badge = document.createElement("div");
       badge.textContent = "M";
       badge.style.cssText =
-        "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.9), rgba(255, 255, 255, 0.62), rgba(222, 239, 255, 0.38));color:#2f9e8f;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.82);";
+        "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.88), rgba(222, 239, 255, 0.72));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
 
       const content = document.createElement("div");
       content.style.cssText = "min-width:0;flex:1;padding-top:1px;";
@@ -378,7 +378,7 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
       const eyebrow = document.createElement("div");
       eyebrow.textContent = "Moodi";
       eyebrow.style.cssText =
-        "margin:0 0 5px;font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#2f9e8f;";
+        "margin:0 0 5px;font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#237b70;";
 
       const heading = document.createElement("div");
       heading.textContent = overlayTitle;
@@ -388,14 +388,14 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
       const body = document.createElement("div");
       body.textContent = overlayMessage;
       body.style.cssText =
-        "margin:0;font-size:13px;line-height:1.5;color:#667085;";
+        "margin:0;font-size:13px;line-height:1.5;color:#3f4a5f;";
 
       const close = document.createElement("button");
       close.type = "button";
       close.textContent = "x";
       close.setAttribute("aria-label", "Dismiss Moodi recommendation");
       close.style.cssText =
-        "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(255, 255, 255, 0.72);border-radius:999px;background:rgba(255, 255, 255, 0.48);color:#667085;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:inset 0 1px 0 rgba(255, 255, 255, 0.72);";
+        "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.1);border-radius:999px;background:rgba(255, 255, 255, 0.78);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 6px 14px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.88);";
       close.addEventListener("click", () => overlay.remove());
 
       content.append(eyebrow, heading, body);
