@@ -14,6 +14,7 @@ import { ExtensionMessage } from "./types";
  * After sign-in, sends the ID token to the service worker.
  */
 export async function signInWithGoogle(): Promise<User> {
+  await clearChromeIdentityCache();
   const token = await getChromeAuthToken();
   const credential = GoogleAuthProvider.credential(null, token);
   const result = await signInWithCredential(auth, credential);
@@ -26,7 +27,7 @@ export async function signInWithGoogle(): Promise<User> {
 }
 
 /**
- * Retrieves a Google OAuth access token via chrome.identity.
+ * Retrieves a Google OAuth access token through Chrome's supported extension flow.
  */
 function getChromeAuthToken(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -49,14 +50,27 @@ function getChromeAuthToken(): Promise<string> {
 }
 
 export async function signOutUser(): Promise<void> {
-  // Revoke the Chrome identity token so re-login prompts fresh consent
-  const token = await getChromeAuthToken().catch(() => null);
-  if (token) {
-    await new Promise<void>((res) =>
-      chrome.identity.removeCachedAuthToken({ token }, res)
-    );
-  }
+  chrome.runtime.sendMessage({ type: "SIGN_OUT_BACKGROUND_AUTH" } satisfies ExtensionMessage);
   await signOut(auth);
+  await clearChromeIdentityCache();
+}
+
+function clearChromeIdentityCache(): Promise<void> {
+  return new Promise((resolve) => {
+    if (chrome.identity.clearAllCachedAuthTokens) {
+      chrome.identity.clearAllCachedAuthTokens(() => resolve());
+      return;
+    }
+
+    chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      if (token && typeof token === "string") {
+        chrome.identity.removeCachedAuthToken({ token }, () => resolve());
+        return;
+      }
+
+      resolve();
+    });
+  });
 }
 
 /**

@@ -26,6 +26,8 @@ interface Props {
 
 interface BaselineComparison {
   sessionCount: number;
+  currentActiveMs: number;
+  currentTabSwitchesPerHour: number;
   avgActiveMs: number;
   avgTabSwitchesPerHour: number;
   durationDeltaPct: number;
@@ -38,6 +40,7 @@ const BASELINE_WINDOW_DAYS = 21;
 const MIN_BASELINE_SESSIONS = 10;
 const MIN_BASELINE_ACTIVE_DAYS = 7;
 const MIN_BASELINE_SESSION_MS = 5 * 60 * 1000;
+const MIN_BASELINE_CURRENT_SESSION_MS = 15 * 60 * 1000;
 
 function formatDuration(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -97,6 +100,10 @@ function buildBaselineComparison(
   currentMetrics: SessionMetrics,
   sessions: Session[]
 ): BaselineComparison | null {
+  if (currentMetrics.totalActiveMs < MIN_BASELINE_CURRENT_SESSION_MS) {
+    return null;
+  }
+
   const validSessions = sessions.filter((session) => {
     return (
       session.metrics &&
@@ -136,6 +143,8 @@ function buildBaselineComparison(
 
   return {
     sessionCount: validSessions.length,
+    currentActiveMs: currentMetrics.totalActiveMs,
+    currentTabSwitchesPerHour,
     avgActiveMs,
     avgTabSwitchesPerHour,
     durationDeltaPct,
@@ -438,10 +447,18 @@ export default function MiniScore({ uid, dailyFocus, onChangeFocus }: Props) {
               <div>
                 <span>Duration</span>
                 <strong>{formatPercentChange(baseline.durationDeltaPct)}</strong>
+                <small>
+                  Now {formatDuration(baseline.currentActiveMs)} vs usual{" "}
+                  {formatDuration(baseline.avgActiveMs)}
+                </small>
               </div>
               <div>
                 <span>Tab switching</span>
                 <strong>{formatPercentChange(baseline.tabSwitchDeltaPct)}</strong>
+                <small>
+                  Now {Math.round(baseline.currentTabSwitchesPerHour)} switches/hour
+                  vs usual {Math.round(baseline.avgTabSwitchesPerHour)}
+                </small>
               </div>
             </div>
             <p>
@@ -452,12 +469,24 @@ export default function MiniScore({ uid, dailyFocus, onChangeFocus }: Props) {
           </>
         ) : (
           <>
-            <h2>Insufficient data</h2>
-            <p>
-              Moodi needs at least {MIN_BASELINE_SESSIONS} meaningful sessions
-              across {MIN_BASELINE_ACTIVE_DAYS} active days before comparing your
-              current activity against a personal baseline.
-            </p>
+            {metrics.totalActiveMs < MIN_BASELINE_CURRENT_SESSION_MS ? (
+              <>
+                <h2>Insufficient current session data</h2>
+                <p>
+                  Moodi will compare this session with your baseline once you have
+                  at least 15 minutes of active screen time.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2>Insufficient data</h2>
+                <p>
+                  Moodi needs at least {MIN_BASELINE_SESSIONS} meaningful sessions
+                  across {MIN_BASELINE_ACTIVE_DAYS} active days before comparing
+                  your current activity against a personal baseline.
+                </p>
+              </>
+            )}
           </>
         )}
       </section>

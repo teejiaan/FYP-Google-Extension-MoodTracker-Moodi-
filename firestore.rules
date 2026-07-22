@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isDeveloper() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "developer";
+    }
+
+    match /users/{uid} {
+      allow create: if isOwner(uid);
+      allow read, update, delete: if isOwner(uid) || isDeveloper();
+
+      match /sessions/{sessionId} {
+        allow read, write, delete: if isOwner(uid) || isDeveloper();
+      }
+
+      match /moodEntries/{entryId} {
+        allow read, write, delete: if isOwner(uid) || isDeveloper();
+      }
+
+      match /dailySummaries/{dateId} {
+        allow read, write, delete: if isOwner(uid) || isDeveloper();
+      }
+    }
+
+    match /feedback/{feedbackId} {
+      allow create: if signedIn();
+      allow read, update, delete: if isDeveloper();
+    }
+
+    match /{path=**}/sessions/{sessionId} {
+      allow read: if isDeveloper();
+    }
+
+    match /{path=**}/dailySummaries/{dateId} {
+      allow read: if isDeveloper();
+    }
+  }
+}

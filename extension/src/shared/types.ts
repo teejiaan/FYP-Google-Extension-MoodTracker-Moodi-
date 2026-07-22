@@ -65,12 +65,14 @@ export interface UserProfile {
 
 export type ExtensionMessage =
   | { type: "AUTH_TOKEN_READY"; token: string }
+  | { type: "SIGN_OUT_BACKGROUND_AUTH" }
   | { type: "DAILY_FOCUS_UPDATED"; focus: DailyFocus }
   | { type: "GET_SESSION_METRICS" }
   | { type: "SESSION_METRICS_RESPONSE"; metrics: SessionMetrics }
   | { type: "RESET_SESSION_TRACKING" }
   | { type: "SESSION_RESET_COMPLETE" }
   | { type: "PAGE_SIGNAL"; signal: PageSignal }
+  | { type: "RECOMMENDATION_OVERLAY_DISMISSED" }
   | {
       type: "SHOW_RECOMMENDATION_OVERLAY";
       title: string;

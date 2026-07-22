@@ -1,6 +1,7 @@
 import {
   GoogleAuthProvider,
   signInWithCredential,
+  signOut,
 } from "firebase/auth";
 import {
   collection,
@@ -37,6 +38,7 @@ const STALE_SESSION_MS = 8 * 60 * 60 * 1000;
 const SESSION_ID_KEY = "moodiActiveSessionDocId";
 const SESSION_START_KEY = "moodiActiveSessionStartMs";
 const SESSION_SIGNALS_KEY = "moodiActiveSessionSignals";
+const SESSION_STATE_KEY = "moodiActiveSessionState";
 let sessionIdentityReady: Promise<void> | null = null;
 let backgroundAuthReady: Promise<void> | null = null;
 
@@ -46,6 +48,20 @@ interface RecordVisitOptions {
 
 type SessionEndReason = "chrome_closed" | "sleep" | "manual_reset";
 type SessionStatus = "active" | "completed";
+
+interface StoredSessionState {
+  sessionDocId: string;
+  sessionStartMs: number;
+  tabSwitches: number;
+  openTabCount: number;
+  currentSiteStart: number;
+  currentUrl: string;
+  currentCategoryOverride: SiteCategory | null;
+  siteVisits: SiteVisit[];
+  pageSignals: typeof pageSignals;
+  browserFocused: boolean;
+  browserFocusChangedAt: number;
+}
 
 export function recordTabSwitch(
   fromUrl: string,
@@ -62,16 +78,17 @@ export function recordTabSwitch(
   currentCategoryOverride = getInheritedCategory(fromUrl, toUrl, options);
   currentSiteStart = now;
   tabSwitches++;
+  persistSessionState();
 }
 
 export function recordPageSignal(idleDeltaMs: number) {
   pageSignals.idleMs += idleDeltaMs;
-  persistSessionSignals();
+  persistSessionState();
 }
 
 export function recordBrowserUnfocused(unfocusedDeltaMs: number) {
   pageSignals.unfocusedMs += unfocusedDeltaMs;
-  persistSessionSignals();
+  persistSessionState();  
 }
 
 export function initializeBrowserFocusState(isFocused: boolean) {
@@ -88,10 +105,12 @@ export function recordBrowserFocusChange(isFocused: boolean) {
 
   browserFocused = isFocused;
   browserFocusChangedAt = now;
+  persistSessionState();
 }
 
 export function recordOpenTabCount(count: number) {
   openTabCount = count;
+  persistSessionState();
 }
 
 export function getSessionMetrics(): SessionMetrics {
@@ -162,6 +181,11 @@ async function writeSession(
 export async function signInBackgroundWithToken(token: string) {
   const credential = GoogleAuthProvider.credential(null, token);
   await signInWithCredential(auth, credential);
+}
+
+export async function signOutBackgroundAuth() {
+  backgroundAuthReady = null;
+  await signOut(auth);
 }
 
 async function ensureBackgroundAuth() {
@@ -243,7 +267,7 @@ function resetSessionState(startMs: number, isFocused: boolean) {
   currentCategoryOverride = null;
   pageSignals.idleMs = 0;
   pageSignals.unfocusedMs = 0;
-  persistSessionSignals();
+  persistSessionState();
   initializeBrowserFocusState(isFocused);
 }
 
@@ -260,17 +284,93 @@ function clearSessionIdentity() {
     SESSION_ID_KEY,
     SESSION_START_KEY,
     SESSION_SIGNALS_KEY,
+    SESSION_STATE_KEY,
   ]);
 }
 
-function persistSessionSignals() {
+function persistSessionState() {
   chrome.storage.local.set({
+    [SESSION_STATE_KEY]: {
+      sessionDocId,
+      sessionStartMs,
+      tabSwitches,
+      openTabCount,
+      currentSiteStart,
+      currentUrl,
+      currentCategoryOverride,
+      siteVisits,
+      pageSignals,
+      browserFocused,
+      browserFocusChangedAt,
+    } satisfies StoredSessionState,
     [SESSION_SIGNALS_KEY]: pageSignals,
   });
 }
 
 async function restoreSessionSignals() {
-  const stored = await chrome.storage.local.get(SESSION_SIGNALS_KEY);
+  const stored = await chrome.storage.local.get([
+    SESSION_SIGNALS_KEY,
+    SESSION_STATE_KEY,
+  ]);
+  const state = stored[SESSION_STATE_KEY] as Partial<StoredSessionState> | undefined;
+
+  if (
+    state &&
+    state.sessionDocId === sessionDocId &&
+    state.sessionStartMs === sessionStartMs
+  ) {
+    tabSwitches = typeof state.tabSwitches === "number" ? state.tabSwitches : 0;
+    openTabCount = typeof state.openTabCount === "number" ? state.openTabCount : 0;
+    currentSiteStart =
+      typeof state.currentSiteStart === "number"
+        ? state.currentSiteStart
+        : sessionStartMs;
+    currentUrl = typeof state.currentUrl === "string" ? state.currentUrl : "";
+    currentCategoryOverride =
+      state.currentCategoryOverride === "productive" ||
+      state.currentCategoryOverride === "social" ||
+      state.currentCategoryOverride === "entertainment" ||
+      state.currentCategoryOverride === "news" ||
+      state.currentCategoryOverride === "shopping" ||
+      state.currentCategoryOverride === "reference" ||
+      state.currentCategoryOverride === "other"
+        ? state.currentCategoryOverride
+        : null;
+    siteVisits.length = 0;
+
+    if (Array.isArray(state.siteVisits)) {
+      siteVisits.push(
+        ...state.siteVisits.filter((visit) => {
+          return (
+            typeof visit.url === "string" &&
+            typeof visit.hostname === "string" &&
+            typeof visit.category === "string" &&
+            typeof visit.dwellMs === "number" &&
+            typeof visit.startedAt === "number"
+          );
+        })
+      );
+    }
+
+    if (typeof state.pageSignals?.idleMs === "number") {
+      pageSignals.idleMs = state.pageSignals.idleMs;
+    }
+
+    if (typeof state.pageSignals?.unfocusedMs === "number") {
+      pageSignals.unfocusedMs = state.pageSignals.unfocusedMs;
+    }
+
+    if (typeof state.browserFocused === "boolean") {
+      browserFocused = state.browserFocused;
+    }
+
+    if (typeof state.browserFocusChangedAt === "number") {
+      browserFocusChangedAt = state.browserFocusChangedAt;
+    }
+
+    return;
+  }
+
   const signals = stored[SESSION_SIGNALS_KEY] as Partial<typeof pageSignals> | undefined;
 
   if (typeof signals?.idleMs === "number") {
@@ -294,6 +394,7 @@ function getVisitsSnapshot(now: number) {
 
 function closeSiteVisit(url: string, endMs: number) {
   siteVisits.push(buildVisit(url, currentSiteStart, endMs, currentCategoryOverride));
+  persistSessionState();
 }
 
 function buildVisit(

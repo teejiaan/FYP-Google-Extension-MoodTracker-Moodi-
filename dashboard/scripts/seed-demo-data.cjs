@@ -187,23 +187,43 @@ function buildDailySummaries(uid, sessions) {
 }
 
 function buildDemoSessions(uid) {
-  const templates = [
-    [13, 21, 40, 11, 10, 1, 8, [["docs.google.com", "productive", 42], ["scholar.google.com", "reference", 31], ["wikipedia.org", "reference", 16]]],
-    [12, 10, 15, 18, 12, 4, 5, [["notion.so", "productive", 52], ["github.com", "productive", 34], ["stackoverflow.com", "productive", 20]]],
-    [11, 23, 20, 32, 18, 2, 3, [["youtube.com", "entertainment", 48], ["reddit.com", "entertainment", 32], ["x.com", "social", 18]]],
-    [10, 14, 5, 9, 7, 8, 14, [["developer.mozilla.org", "reference", 44], ["stackoverflow.com", "productive", 28], ["chatgpt.com", "productive", 24]]],
-    [9, 9, 25, 15, 16, 3, 4, [["figma.com", "productive", 40], ["docs.google.com", "productive", 35], ["medium.com", "reference", 22]]],
-    [8, 20, 55, 26, 19, 1, 2, [["scholar.google.com", "reference", 70], ["researchgate.net", "reference", 35], ["docs.google.com", "productive", 20]]],
-    [7, 16, 10, 8, 9, 6, 9, [["linkedin.com", "social", 18], ["notion.so", "productive", 42], ["docs.google.com", "productive", 26]]],
-    [6, 22, 35, 35, 22, 1, 2, [["youtube.com", "entertainment", 66], ["instagram.com", "social", 24], ["spotify.com", "entertainment", 18]]],
-    [5, 11, 0, 13, 11, 5, 6, [["chatgpt.com", "productive", 38], ["docs.google.com", "productive", 40], ["perplexity.ai", "productive", 25]]],
-    [4, 13, 30, 20, 17, 2, 7, [["scholar.google.com", "reference", 50], ["arxiv.org", "reference", 36], ["docs.google.com", "productive", 28]]],
-    [3, 0, 20, 42, 24, 1, 1, [["youtube.com", "entertainment", 78], ["reddit.com", "entertainment", 41], ["tiktok.com", "social", 22]]],
-    [2, 15, 45, 16, 15, 3, 5, [["github.com", "productive", 45], ["chatgpt.com", "productive", 36], ["stackoverflow.com", "productive", 31]]],
-    [1, 18, 25, 28, 20, 2, 3, [["docs.google.com", "productive", 60], ["scholar.google.com", "reference", 46], ["youtube.com", "entertainment", 19]]],
-    [0, 9, 40, 7, 10, 6, 8, [["notion.so", "productive", 24], ["docs.google.com", "productive", 28], ["wikipedia.org", "reference", 14]]],
-    [0, 14, 10, 22, 21, 1, 2, [["scholar.google.com", "reference", 38], ["arxiv.org", "reference", 30], ["chatgpt.com", "productive", 18], ["docs.google.com", "productive", 22]]],
+  const focusBlocks = [
+    [["docs.google.com", "productive", 34], ["scholar.google.com", "reference", 28], ["chatgpt.com", "productive", 18]],
+    [["notion.so", "productive", 30], ["github.com", "productive", 24], ["stackoverflow.com", "productive", 16]],
+    [["arxiv.org", "reference", 38], ["researchgate.net", "reference", 22], ["docs.google.com", "productive", 20]],
+    [["developer.mozilla.org", "reference", 26], ["perplexity.ai", "productive", 22], ["medium.com", "reference", 16]],
   ];
+  const mixedBlocks = [
+    [["youtube.com", "entertainment", 35], ["reddit.com", "entertainment", 21], ["x.com", "social", 14]],
+    [["linkedin.com", "social", 16], ["docs.google.com", "productive", 28], ["wikipedia.org", "reference", 18]],
+    [["youtube.com", "entertainment", 22], ["instagram.com", "social", 16], ["notion.so", "productive", 24]],
+  ];
+  const templates = [];
+
+  for (let daysAgo = 13; daysAgo >= 0; daysAgo -= 1) {
+    const isRecentWeek = daysAgo <= 6;
+    const sessionCount = isRecentWeek ? 3 : daysAgo % 2 === 0 ? 2 : 1;
+    const baseHours = isRecentWeek ? [9, 14, daysAgo % 3 === 0 ? 23 : 19] : [10, 16];
+
+    for (let index = 0; index < sessionCount; index += 1) {
+      const highSwitching = isRecentWeek && index === 2;
+      const block =
+        highSwitching || (daysAgo + index) % 5 === 0
+          ? mixedBlocks[(daysAgo + index) % mixedBlocks.length]
+          : focusBlocks[(daysAgo + index) % focusBlocks.length];
+
+      templates.push([
+        daysAgo,
+        baseHours[index],
+        (daysAgo * 7 + index * 13) % 55,
+        highSwitching ? 60 + daysAgo : 8 + ((daysAgo + index) % 14),
+        highSwitching ? 18 + index : 7 + ((daysAgo + index) % 10),
+        index === 1 ? 5 + (daysAgo % 4) : 1 + (daysAgo % 3),
+        index === 0 ? 6 + (daysAgo % 5) : 1 + (index % 3),
+        block,
+      ]);
+    }
+  }
 
   return templates.map((template, index) => {
     const [daysAgo, hour, minute, tabSwitches, openTabCount, idleMinutes, unfocusedMinutes, siteRows] = template;

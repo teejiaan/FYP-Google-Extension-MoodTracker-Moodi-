@@ -1,14 +1,18 @@
-import { ExtensionMessage, PageSignal } from "../shared/types";
+import type { ExtensionMessage, PageSignal } from "../shared/types";
 
 const SIGNAL_INTERVAL_MS = 10_000;
 const IDLE_TIMEOUT_MS = 60_000;
+const IDLE_OVERLAY_THRESHOLD_MS = 15 * 60 * 1000;
+const CONSENT_ACCEPTED_KEY = "moodiConsentAccepted";
+const OVERLAY_ENABLED_KEY = "moodiOverlayEnabled";
 
 let lastInteractionTs = Date.now();
 let maxScrollDepth = 0;
+let idleOverlayShown = false;
 
 function markInteraction() {
   lastInteractionTs = Date.now();
-  document.getElementById("moodi-idle-overlay")?.remove();
+  idleOverlayShown = false;
 }
 
 [
@@ -71,6 +75,8 @@ function sendSignal() {
   const isIdle =
     isFocused && continuousIdleMs > IDLE_TIMEOUT_MS && !isMediaPlaying();
 
+  maybeShowLocalIdleOverlay(isIdle, continuousIdleMs);
+
   const signal: PageSignal = {
     url: location.href,
     scrollDepth: maxScrollDepth,
@@ -89,6 +95,31 @@ function sendSignal() {
   }
 }
 
+async function isLocalOverlayEnabled() {
+  const stored = await chrome.storage.local.get([
+    CONSENT_ACCEPTED_KEY,
+    OVERLAY_ENABLED_KEY,
+  ]);
+
+  return (
+    stored[CONSENT_ACCEPTED_KEY] === true &&
+    stored[OVERLAY_ENABLED_KEY] !== false
+  );
+}
+
+function maybeShowLocalIdleOverlay(isIdle: boolean, continuousIdleMs: number) {
+  if (!isIdle || idleOverlayShown || continuousIdleMs < IDLE_OVERLAY_THRESHOLD_MS) {
+    return;
+  }
+
+  isLocalOverlayEnabled().then((enabled) => {
+    if (!enabled || idleOverlayShown) return;
+
+    idleOverlayShown = true;
+    showIdleOverlay(Math.round(continuousIdleMs / 60000));
+  });
+}
+
 function showIdleOverlay(idleMinutes: number) {
   document.getElementById("moodi-idle-overlay")?.remove();
 
@@ -104,7 +135,7 @@ function showIdleOverlay(idleMinutes: number) {
     "background: rgba(23, 32, 51, 0.28)",
     "backdrop-filter: blur(8px)",
     "-webkit-backdrop-filter: blur(8px)",
-    "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+    "font-family: Aptos, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif",
   ].join(";");
 
   const card = document.createElement("div");
@@ -160,15 +191,15 @@ function showRecommendationOverlay(title: string, message: string) {
     "z-index: 2147483647",
     "width: min(390px, calc(100vw - 48px))",
     "padding: 0",
-    "border: 1px solid rgba(255, 255, 255, 0.92)",
+    "border: 1px solid rgba(255, 255, 255, 0.96)",
     "border-radius: 30px",
-    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(236, 248, 246, 0.9) 52%, rgba(226, 242, 255, 0.86))",
-    "box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
-    "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+    "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(253, 255, 255, 0.98), rgba(242, 251, 249, 0.97) 52%, rgba(232, 244, 255, 0.96))",
+    "box-shadow: 0 24px 58px rgba(23, 32, 51, 0.2), 0 0 0 1px rgba(23, 32, 51, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.96)",
+    "font-family: Aptos, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif",
     "color: #172033",
     "overflow: hidden",
-    "backdrop-filter: blur(24px) saturate(1.25)",
-    "-webkit-backdrop-filter: blur(24px) saturate(1.25)",
+    "backdrop-filter: blur(18px) saturate(1.12)",
+    "-webkit-backdrop-filter: blur(18px) saturate(1.12)",
   ].join(";");
 
   const accent = document.createElement("div");
@@ -181,7 +212,7 @@ function showRecommendationOverlay(title: string, message: string) {
   const badge = document.createElement("div");
   badge.textContent = "M";
   badge.style.cssText =
-    "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.88), rgba(222, 239, 255, 0.72));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
+    "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.9), rgba(230, 243, 255, 0.78));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 8px 18px rgba(23, 32, 51, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.92);";
 
   const content = document.createElement("div");
   content.style.cssText = "min-width:0;flex:1;padding-top:1px;";
@@ -206,8 +237,11 @@ function showRecommendationOverlay(title: string, message: string) {
   closeButton.textContent = "x";
   closeButton.setAttribute("aria-label", "Dismiss Moodi recommendation");
   closeButton.style.cssText =
-    "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.1);border-radius:999px;background:rgba(255, 255, 255, 0.78);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 6px 14px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.88);";
-  closeButton.addEventListener("click", () => overlay.remove());
+    "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.08);border-radius:999px;background:rgba(255, 255, 255, 0.84);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 5px 12px rgba(23, 32, 51, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
+  closeButton.addEventListener("click", () => {
+    overlay.remove();
+    chrome.runtime.sendMessage({ type: "RECOMMENDATION_OVERLAY_DISMISSED" });
+  });
 
   content.append(eyebrow, titleEl, messageEl);
   row.append(badge, content, closeButton);

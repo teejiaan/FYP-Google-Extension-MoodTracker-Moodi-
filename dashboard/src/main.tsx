@@ -36,6 +36,8 @@ import "./styles.css";
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: "select_account" });
 const APP_VERSION = "v1.0.0";
+const PERSONAL_HISTORY_DAYS = 7;
+const FEEDBACK_FILTERS = ["All", "Accuracy", "UI", "Suggestion", "Bug"] as const;
 const CATEGORY_ORDER: SiteCategory[] = [
   "productive",
   "reference",
@@ -45,6 +47,7 @@ const CATEGORY_ORDER: SiteCategory[] = [
   "shopping",
   "other",
 ];
+type FeedbackFilter = (typeof FEEDBACK_FILTERS)[number];
 const MIN_MEANINGFUL_SESSION_MS = 5 * 60 * 1000;
 const MIN_MEANINGFUL_SITE_MS = 30 * 1000;
 
@@ -138,6 +141,14 @@ function getLocalDateKey(ms: number) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getPersonalHistoryStartMs() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (PERSONAL_HISTORY_DAYS - 1));
+
+  return start.getTime();
 }
 
 function buildDailySummariesFromSessions(sessions: Session[]): DailySummary[] {
@@ -239,6 +250,7 @@ function App() {
   const [developerSessions, setDeveloperSessions] = useState<Session[]>([]);
   const [developerDailySummaries, setDeveloperDailySummaries] = useState<DailySummary[]>([]);
   const [feedbackEntries, setFeedbackEntries] = useState<FeedbackEntry[]>([]);
+  const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilter>("All");
   const [loadingData, setLoadingData] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -393,13 +405,17 @@ function App() {
   }
 
   const summary = useMemo(() => {
-    const totalActiveMs = sessions.reduce((total, session) => {
+    const historyStartMs = getPersonalHistoryStartMs();
+    const recentSessions = sessions.filter((session) => {
+      return (session.endedAt ?? 0) >= historyStartMs;
+    });
+    const totalActiveMs = recentSessions.reduce((total, session) => {
       return total + (session.metrics?.totalActiveMs ?? 0);
     }, 0);
-    const totalTabSwitches = sessions.reduce((total, session) => {
+    const totalTabSwitches = recentSessions.reduce((total, session) => {
       return total + (session.metrics?.tabSwitches ?? 0);
     }, 0);
-    const stressScores = sessions.map((session) => {
+    const stressScores = recentSessions.map((session) => {
       return calculateStressIndicator(session.metrics).points;
     });
     const averageStress =
@@ -411,10 +427,36 @@ function App() {
       totalActiveMs,
       totalTabSwitches,
       averageStress,
-      sessionCount: sessions.length,
+      sessionCount: recentSessions.length,
       moodCount: moodEntries.length,
     };
   }, [sessions, moodEntries]);
+
+  const last7DaySessions = useMemo(() => {
+    const historyStartMs = getPersonalHistoryStartMs();
+    return sessions.filter((session) => (session.endedAt ?? 0) >= historyStartMs);
+  }, [sessions]);
+
+  const last7DaySummaries = useMemo(() => {
+    const historyStartDate = getLocalDateKey(getPersonalHistoryStartMs());
+    return dailySummaries.filter((day) => day.date >= historyStartDate);
+  }, [dailySummaries]);
+
+  const sessionsByDate = useMemo(() => {
+    const groups = new Map<string, Session[]>();
+
+    for (const session of last7DaySessions) {
+      const date = getLocalDateKey(session.endedAt);
+      groups.set(date, [...(groups.get(date) ?? []), session]);
+    }
+
+    return [...groups.entries()]
+      .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
+      .map(([date, rows]) => ({
+        date,
+        sessions: rows.sort((a, b) => b.endedAt - a.endedAt),
+      }));
+  }, [last7DaySessions]);
 
   const developerSummary = useMemo(() => {
     const derivedDailySummaries = buildDailySummariesFromSessions(developerSessions);
@@ -468,6 +510,12 @@ function App() {
             : "No analytics data yet",
     };
   }, [developerDailySummaries, developerSessions, feedbackEntries]);
+
+  const filteredFeedbackEntries = useMemo(() => {
+    if (feedbackFilter === "All") return feedbackEntries;
+
+    return feedbackEntries.filter((entry) => entry.type === feedbackFilter);
+  }, [feedbackEntries, feedbackFilter]);
 
   function exportJson() {
     const payload = {
@@ -626,8 +674,8 @@ function App() {
       </header>
 
       {role === "developer" && dashboardView === "developer" ? (
-        <>
-          <section className="summary-grid">
+        <React.Fragment key="developer-dashboard">
+          <section className="summary-grid" key="developer-summary">
             <article>
               <span>Tracked users</span>
               <strong>{developerSummary.uniqueUserCount}</strong>
@@ -646,7 +694,7 @@ function App() {
             </article>
           </section>
 
-          <section className="analytics-health panel">
+          <section className="analytics-health panel" key="developer-analytics-health">
             <div>
               <span className="eyebrow">Analytics source</span>
               <h2>{developerSummary.dataSource}</h2>
@@ -658,7 +706,7 @@ function App() {
             </div>
           </section>
 
-          <section className="developer-grid">
+          <section className="developer-grid" key="developer-grid">
             <article className="panel chart-panel">
               <div className="section-heading">
                 <h2>Daily screen time trend</h2>
@@ -745,12 +793,31 @@ function App() {
             </article>
 
             <article className="panel feedback-panel">
-              <h2>User feedback</h2>
-              {feedbackEntries.length === 0 ? (
-                <p className="empty-text">No feedback submitted yet.</p>
+              <div className="section-heading">
+                <h2>User feedback</h2>
+                <span className="feedback-count">
+                  {filteredFeedbackEntries.length}/{feedbackEntries.length}
+                </span>
+              </div>
+
+              <div className="feedback-filter" aria-label="Filter feedback by type">
+                {FEEDBACK_FILTERS.map((filter) => (
+                  <button
+                    type="button"
+                    key={filter}
+                    className={feedbackFilter === filter ? "active" : ""}
+                    onClick={() => setFeedbackFilter(filter)}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+
+              {filteredFeedbackEntries.length === 0 ? (
+                <p className="empty-text">No feedback found for this filter.</p>
               ) : (
                 <div className="feedback-list">
-                  {feedbackEntries.slice(0, 8).map((entry) => (
+                  {filteredFeedbackEntries.slice(0, 8).map((entry) => (
                     <div className="feedback-row" key={entry.id}>
                       <div>
                         <strong>
@@ -765,13 +832,13 @@ function App() {
               )}
             </article>
           </section>
-        </>
+        </React.Fragment>
       ) : (
-        <>
+        <React.Fragment key="personal-dashboard">
 
-      <section className="summary-grid">
+      <section className="summary-grid" key="personal-summary">
         <article>
-          <span>Total screen time</span>
+          <span>7 day screen time</span>
           <strong>{formatDuration(summary.totalActiveMs)}</strong>
         </article>
         <article>
@@ -788,13 +855,13 @@ function App() {
         </article>
       </section>
 
-      <section className="controls-card">
+      <section className="controls-card" key="personal-controls">
         <div>
           <span className="eyebrow">Data controls</span>
           <h2>Export or delete history</h2>
           <p>
-            Exports include behavioural sessions and mood check-ins for the signed-in
-            account.
+            Summary cards show the last 7 days. Exports include all behavioural
+            sessions and mood check-ins for the signed-in account.
           </p>
         </div>
         <div className="control-buttons">
@@ -807,19 +874,19 @@ function App() {
         {status && <p className="status-text">{status}</p>}
       </section>
 
-      <section className="content-grid">
+      <section className="content-grid" key="personal-content">
         <article className="panel">
           <div className="section-heading">
-            <h2>Recent sessions</h2>
+            <h2>Sessions this week</h2>
             <button onClick={() => loadData(user)} disabled={loadingData}>
               Refresh
             </button>
           </div>
-          {sessions.length === 0 ? (
-            <p className="empty-text">No sessions found yet.</p>
+          {sessionsByDate.length === 0 ? (
+            <p className="empty-text">No sessions found for the last 7 days.</p>
           ) : (
             <div className="session-list">
-              {sessions.slice(0, 12).map((session) => {
+              {last7DaySessions.map((session) => {
                 const score = calculateStressIndicator(session.metrics);
                 return (
                   <div className="session-row" key={session.id}>
@@ -831,7 +898,9 @@ function App() {
                         {getDominantCategory(session)}
                       </span>
                     </div>
-                    <b className={`level-pill ${score.level}`}>{score.level}</b>
+                    <span className={`session-level session-level-${score.level}`}>
+                      {score.level}
+                    </span>
                   </div>
                 );
               })}
@@ -841,11 +910,11 @@ function App() {
 
         <article className="panel">
           <h2>Daily summaries</h2>
-          {dailySummaries.length === 0 ? (
-            <p className="empty-text">No daily summaries found yet.</p>
+          {last7DaySummaries.length === 0 ? (
+            <p className="empty-text">No daily summaries found for the last 7 days.</p>
           ) : (
             <div className="session-list">
-              {dailySummaries.slice(0, 7).map((day) => (
+              {last7DaySummaries.slice(0, 7).map((day) => (
                 <div className="session-row" key={day.id}>
                   <div>
                     <strong>{day.date}</strong>
@@ -879,7 +948,7 @@ function App() {
           )}
         </article>
       </section>
-        </>
+        </React.Fragment>
       )}
     </main>
   );

@@ -11,6 +11,7 @@ import {
   endCurrentSession,
   initializeSessionIdentity,
   signInBackgroundWithToken,
+  signOutBackgroundAuth,
   startNewSessionIdentity,
   startFlushTimer,
 } from "./session-bundler";
@@ -21,15 +22,20 @@ let previousUrl = "";
 let lastPageSignalTs = Date.now();
 let lastContinuousIdleMs = 0;
 let idleOverlayShown = false;
+let activeRecommendationOverlay: ActiveRecommendationOverlay | null = null;
+let focusChangeSequence = 0;
 
 const CURRENT_FOCUS_KEY = "moodiCurrentDailyFocus";
 const LAST_NOTIFICATION_KEY = "moodiLastRecommendationNotification";
 const NOTIFICATION_ALARM_NAME = "moodiRecommendationCheck";
-// Temporary screenshot timing. Keep the short reminder interval while documenting.
-const NOTIFICATION_CHECK_INTERVAL_MS = 30 * 1000;
-const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000;
+const NOTIFICATION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000;
+const ENCOURAGEMENT_DELAY_MS = 10 * 60 * 1000;
+const ENCOURAGEMENT_WINDOW_MS = 30 * 60 * 1000;
+const RECOMMENDATION_OVERLAY_VISIBLE_MS = 20 * 1000;
 const SLEEP_SIGNAL_GAP_MS = 5 * 60 * 1000;
 const LAST_ACTIVE_GRACE_MS = 15 * 1000;
+const FOCUS_LOSS_RECHECK_MS = 1500;
 const IDLE_OVERLAY_THRESHOLD_MS = 15 * 60 * 1000;
 const IDLE_SIGNAL_STATE_KEY = "moodiIdleSignalState";
 
@@ -41,6 +47,23 @@ interface StoredDailyFocus {
 interface StoredNotification {
   id: string;
   shownAt: number;
+  encouragedAt?: number;
+  focus?: DailyFocus;
+  snapshot?: RecommendationSnapshot;
+}
+
+interface RecommendationSnapshot {
+  activeMinutes: number;
+  tabSwitchesPerHour: number;
+  productiveRatio: number;
+  distractionRatio: number;
+  idleMs: number;
+}
+
+interface ActiveRecommendationOverlay {
+  title: string;
+  message: string;
+  expiresAt: number;
 }
 
 async function isTrackingEnabled() {
@@ -84,15 +107,35 @@ async function updateOpenTabCount() {
   recordOpenTabCount(tabs.length);
 }
 
+async function hasFocusedNormalBrowserWindow() {
+  const windows = await chrome.windows
+    .getAll({ windowTypes: ["normal"] })
+    .catch(() => []);
+
+  return windows.some((chromeWindow) => chromeWindow.focused);
+}
+
 async function seedBrowserFocusState() {
-  const window = await chrome.windows.getLastFocused().catch(() => null);
-  initializeBrowserFocusState(Boolean(window?.focused));
+  initializeBrowserFocusState(await hasFocusedNormalBrowserWindow());
 }
 
 async function handleBrowserFocusChange(windowId: number) {
   if (!(await isTrackingEnabled())) return;
 
-  recordBrowserFocusChange(windowId !== chrome.windows.WINDOW_ID_NONE);
+  const sequence = ++focusChangeSequence;
+
+  if (windowId === chrome.windows.WINDOW_ID_NONE) {
+    setTimeout(async () => {
+      if (sequence !== focusChangeSequence) return;
+
+      const focused = await hasFocusedNormalBrowserWindow();
+      recordBrowserFocusChange(focused);
+      lastPageSignalTs = Date.now();
+    }, FOCUS_LOSS_RECHECK_MS);
+    return;
+  }
+
+  recordBrowserFocusChange(await hasFocusedNormalBrowserWindow());
   lastPageSignalTs = Date.now();
 }
 
@@ -172,37 +215,37 @@ function getNotificationRecommendation(
   metrics: SessionMetrics,
   focus: DailyFocus
 ) {
-  const activeMinutes = metrics.totalActiveMs / 60000;
-  const productiveMs =
-    (metrics.categoryBreakdown.productive ?? 0) +
-    (metrics.categoryBreakdown.reference ?? 0);
-  const distractionMs =
-    (metrics.categoryBreakdown.social ?? 0) +
-    (metrics.categoryBreakdown.entertainment ?? 0);
-  const productiveRatio = productiveMs / Math.max(metrics.totalActiveMs, 1);
-  const distractionRatio = distractionMs / Math.max(metrics.totalActiveMs, 1);
-  const tabSwitchesPerHour =
-    metrics.tabSwitches / Math.max(metrics.totalActiveMs / 3600000, 0.25);
+  const {
+    activeMinutes,
+    productiveRatio,
+    distractionRatio,
+    tabSwitchesPerHour,
+  } = getRecommendationSnapshot(metrics);
 
-  if (focus === "academic" && activeMinutes >= 5 && productiveRatio >= 0.55) {
+  if (focus === "academic" && activeMinutes >= 120 && productiveRatio >= 0.55) {
     return {
       id: "academic-long-reset",
       title: "Take a focused reset",
       message:
-        "You have been in a steady research or work stretch. Step away for a few minutes, hydrate, and rest your eyes.",
+        "You have been in a long research or work stretch. Step away for 10 to 15 minutes, hydrate, and rest your eyes.",
     };
   }
 
-  if (focus === "academic" && activeMinutes >= 3 && productiveRatio >= 0.55) {
+  if (focus === "academic" && activeMinutes >= 60 && productiveRatio >= 0.55) {
     return {
       id: "academic-short-break",
       title: "Keep your pace sustainable",
       message:
-        "Your session is becoming a focused work block. Consider a short pause soon so your attention stays fresh.",
+        "You are building a focused work block. Consider a short pause soon so your attention stays fresh.",
     };
   }
 
-  if (focus === "academic" && tabSwitchesPerHour >= 30 && metrics.tabSwitches >= 6) {
+  if (
+    focus === "academic" &&
+    activeMinutes >= 15 &&
+    tabSwitchesPerHour >= 45 &&
+    metrics.tabSwitches >= 12
+  ) {
     return {
       id: "academic-context-switching",
       title: "Reduce tab switching",
@@ -211,7 +254,7 @@ function getNotificationRecommendation(
     };
   }
 
-  if (focus === "academic" && distractionRatio >= 0.35 && activeMinutes >= 3) {
+  if (focus === "academic" && distractionRatio >= 0.35 && activeMinutes >= 20) {
     return {
       id: "academic-distraction",
       title: "Check your intention",
@@ -220,7 +263,7 @@ function getNotificationRecommendation(
     };
   }
 
-  if (focus === "casual" && activeMinutes >= 5 && distractionRatio >= 0.45) {
+  if (focus === "casual" && activeMinutes >= 90 && distractionRatio >= 0.45) {
     return {
       id: "casual-long-break",
       title: "Pause and check in",
@@ -229,21 +272,102 @@ function getNotificationRecommendation(
     };
   }
 
-  if (focus === "academic" && activeMinutes >= 5) {
+  return null;
+}
+
+function getRecommendationSnapshot(metrics: SessionMetrics): RecommendationSnapshot {
+  const productiveMs =
+    (metrics.categoryBreakdown.productive ?? 0) +
+    (metrics.categoryBreakdown.reference ?? 0);
+  const distractionMs =
+    (metrics.categoryBreakdown.social ?? 0) +
+    (metrics.categoryBreakdown.entertainment ?? 0);
+
+  return {
+    activeMinutes: metrics.totalActiveMs / 60000,
+    tabSwitchesPerHour:
+      metrics.tabSwitches / Math.max(metrics.totalActiveMs / 3600000, 0.25),
+    productiveRatio: productiveMs / Math.max(metrics.totalActiveMs, 1),
+    distractionRatio: distractionMs / Math.max(metrics.totalActiveMs, 1),
+    idleMs: metrics.idleMs,
+  };
+}
+
+function getFollowThroughEncouragement(
+  last: Partial<StoredNotification> | undefined,
+  metrics: SessionMetrics,
+  focus: DailyFocus,
+  now: number
+) {
+  if (
+    !last?.id ||
+    !last.snapshot ||
+    last.focus !== focus ||
+    typeof last.shownAt !== "number" ||
+    typeof last.encouragedAt === "number"
+  ) {
+    return null;
+  }
+
+  const elapsedMs = now - last.shownAt;
+  if (
+    elapsedMs < ENCOURAGEMENT_DELAY_MS ||
+    elapsedMs > ENCOURAGEMENT_WINDOW_MS
+  ) {
+    return null;
+  }
+
+  const current = getRecommendationSnapshot(metrics);
+  const tabSwitchingImproved =
+    current.tabSwitchesPerHour <= last.snapshot.tabSwitchesPerHour * 0.85 ||
+    current.tabSwitchesPerHour <= 24;
+  const distractionImproved =
+    current.distractionRatio <= last.snapshot.distractionRatio * 0.85 ||
+    current.distractionRatio <= 0.25;
+  const stayedProductive =
+    focus === "academic" &&
+    current.productiveRatio >= Math.min(0.8, last.snapshot.productiveRatio);
+  const tookShortReset = current.idleMs - last.snapshot.idleMs >= 60 * 1000;
+
+  if (last.id.includes("context-switching") && tabSwitchingImproved) {
     return {
-      id: "academic-demo-general",
-      title: "Time for a short reset",
+      title: "Good focus recovery",
       message:
-        "You have been active in academic/work mode for a while. Take a brief reset before continuing.",
+        "Your browsing looks steadier since the last reminder. Keep one priority in front of you.",
     };
   }
 
-  if (focus === "casual" && activeMinutes >= 5) {
+  if (last.id.includes("distraction") && distractionImproved) {
     return {
-      id: "casual-demo-general",
-      title: "Take a mindful pause",
+      title: "Back on track",
       message:
-        "You have been casually browsing for a while. Pause briefly and decide whether you want to continue.",
+        "You have shifted away from distracting browsing. Stay with the task while the momentum is there.",
+    };
+  }
+
+  if (last.id.includes("reset") || last.id.includes("break")) {
+    if (tookShortReset) {
+      return {
+        title: "Nice reset",
+        message:
+          "You stepped away for a bit. Ease back in and keep the pace comfortable.",
+      };
+    }
+
+    if (stayedProductive) {
+      return {
+        title: "Steady follow-through",
+        message:
+          "You stayed with productive browsing after the reminder. Keep checking in with your energy.",
+      };
+    }
+  }
+
+  if (current.activeMinutes >= last.snapshot.activeMinutes + 4) {
+    return {
+      title: "Good follow-through",
+      message:
+        "Your session looks steady since the last reminder. Keep going at a comfortable pace.",
     };
   }
 
@@ -272,12 +396,25 @@ async function maybeShowRecommendationNotification() {
   const focus = await getCurrentDailyFocus();
   if (!focus) return;
 
-  const recommendation = getNotificationRecommendation(getSessionMetrics(), focus);
-  if (!recommendation) return;
-
+  const metrics = getSessionMetrics();
   const stored = await chrome.storage.local.get(LAST_NOTIFICATION_KEY);
   const last = stored[LAST_NOTIFICATION_KEY] as Partial<StoredNotification> | undefined;
   const now = Date.now();
+  const encouragement = getFollowThroughEncouragement(last, metrics, focus, now);
+
+  if (encouragement) {
+    await showRecommendationOverlay(encouragement.title, encouragement.message);
+    await chrome.storage.local.set({
+      [LAST_NOTIFICATION_KEY]: {
+        ...last,
+        encouragedAt: now,
+      },
+    });
+    return;
+  }
+
+  const recommendation = getNotificationRecommendation(metrics, focus);
+  if (!recommendation) return;
 
   if (
     last &&
@@ -294,6 +431,8 @@ async function maybeShowRecommendationNotification() {
     [LAST_NOTIFICATION_KEY]: {
       id: recommendation.id,
       shownAt: now,
+      focus,
+      snapshot: getRecommendationSnapshot(metrics),
     },
   });
 }
@@ -301,19 +440,51 @@ async function maybeShowRecommendationNotification() {
 async function showRecommendationOverlay(title: string, message: string) {
   if (!(await isOverlayEnabled())) return;
 
+  activeRecommendationOverlay = {
+    title,
+    message,
+    expiresAt: Date.now() + RECOMMENDATION_OVERLAY_VISIBLE_MS,
+  };
+
   const [tab] = await chrome.tabs
     .query({ active: true, currentWindow: true })
     .catch(() => []);
 
   if (!tab?.id || !isTrackableUrl(tab.url)) return;
 
+  await sendRecommendationOverlayToTab(tab.id, title, message);
+}
+
+async function replayActiveRecommendationOverlay(tabId: number, url?: string) {
+  if (!activeRecommendationOverlay) return;
+
+  if (Date.now() >= activeRecommendationOverlay.expiresAt) {
+    activeRecommendationOverlay = null;
+    return;
+  }
+
+  if (!(await isOverlayEnabled())) return;
+  if (!isTrackableUrl(url)) return;
+
+  await sendRecommendationOverlayToTab(
+    tabId,
+    activeRecommendationOverlay.title,
+    activeRecommendationOverlay.message
+  );
+}
+
+async function sendRecommendationOverlayToTab(
+  tabId: number,
+  title: string,
+  message: string
+) {
   await chrome.tabs
-    .sendMessage(tab.id, {
+    .sendMessage(tabId, {
       type: "SHOW_RECOMMENDATION_OVERLAY",
       title,
       message,
     } satisfies ExtensionMessage)
-    .catch(() => injectRecommendationOverlay(tab.id!, title, message));
+    .catch(() => injectRecommendationOverlay(tabId, title, message));
 }
 
 async function showIdleWarningOverlay(idleMinutes: number) {
@@ -349,15 +520,15 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
         "z-index: 2147483647",
         "width: min(390px, calc(100vw - 48px))",
         "padding: 0",
-        "border: 1px solid rgba(255, 255, 255, 0.92)",
+        "border: 1px solid rgba(255, 255, 255, 0.96)",
         "border-radius: 30px",
-        "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(236, 248, 246, 0.9) 52%, rgba(226, 242, 255, 0.86))",
-        "box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(23, 32, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.95)",
-        "font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+        "background: radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.98), transparent 38%), linear-gradient(145deg, rgba(253, 255, 255, 0.98), rgba(242, 251, 249, 0.97) 52%, rgba(232, 244, 255, 0.96))",
+        "box-shadow: 0 24px 58px rgba(23, 32, 51, 0.2), 0 0 0 1px rgba(23, 32, 51, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.96)",
+        "font-family: Aptos, 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif",
         "color: #172033",
         "overflow: hidden",
-        "backdrop-filter: blur(24px) saturate(1.25)",
-        "-webkit-backdrop-filter: blur(24px) saturate(1.25)",
+        "backdrop-filter: blur(18px) saturate(1.12)",
+        "-webkit-backdrop-filter: blur(18px) saturate(1.12)",
       ].join(";");
 
       const accent = document.createElement("div");
@@ -370,7 +541,7 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
       const badge = document.createElement("div");
       badge.textContent = "M";
       badge.style.cssText =
-        "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.88), rgba(222, 239, 255, 0.72));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 10px 24px rgba(23, 32, 51, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
+        "display:grid;place-items:center;flex:0 0 auto;width:40px;height:40px;border-radius:18px;background:linear-gradient(145deg, rgba(233, 247, 245, 0.98), rgba(255, 255, 255, 0.9), rgba(230, 243, 255, 0.78));color:#237b70;font-size:15px;font-weight:850;box-shadow:0 8px 18px rgba(23, 32, 51, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.92);";
 
       const content = document.createElement("div");
       content.style.cssText = "min-width:0;flex:1;padding-top:1px;";
@@ -395,22 +566,25 @@ function injectRecommendationOverlay(tabId: number, title: string, message: stri
       close.textContent = "x";
       close.setAttribute("aria-label", "Dismiss Moodi recommendation");
       close.style.cssText =
-        "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.1);border-radius:999px;background:rgba(255, 255, 255, 0.78);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 6px 14px rgba(23, 32, 51, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.88);";
-      close.addEventListener("click", () => overlay.remove());
+        "display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border:1px solid rgba(23, 32, 51, 0.08);border-radius:999px;background:rgba(255, 255, 255, 0.84);color:#3f4a5f;font-size:16px;line-height:1;cursor:pointer;padding:0;box-shadow:0 5px 12px rgba(23, 32, 51, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.9);";
+      close.addEventListener("click", () => {
+        overlay.remove();
+        chrome.runtime.sendMessage({ type: "RECOMMENDATION_OVERLAY_DISMISSED" });
+      });
 
       content.append(eyebrow, heading, body);
       row.append(badge, content, close);
       overlay.append(accent, row);
       document.documentElement.appendChild(overlay);
-      window.setTimeout(() => overlay.remove(), 20_000);
+      setTimeout(() => overlay.remove(), 20_000);
     },
   });
 }
 
 function startRecommendationTimer() {
   chrome.alarms.create(NOTIFICATION_ALARM_NAME, {
-    delayInMinutes: 1,
-    periodInMinutes: 1,
+    delayInMinutes: 5,
+    periodInMinutes: 5,
   });
 
   setInterval(() => {
@@ -429,6 +603,8 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 
   const tab = await chrome.tabs.get(tabId).catch(() => null);
   if (!tab) return;
+  await replayActiveRecommendationOverlay(tabId, tab.url);
+
   const url = tab.url;
   if (!url || !isTrackableUrl(url)) return;
 
@@ -443,6 +619,10 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status !== "complete") return;
   updateOpenTabCount();
+  if (tab.active) {
+    await replayActiveRecommendationOverlay(tabId, tab.url);
+  }
+
   if (!(await isTrackingEnabled())) return;
   if (!tab.active || !isTrackableUrl(tab.url)) return;
 
@@ -503,7 +683,16 @@ chrome.runtime.onMessage.addListener(
         isTrackingEnabled().then(async (enabled) => {
           const signalUrl = getTrackableUrl(signal.url);
 
-          if (!enabled || !signal.isFocused || signalUrl !== previousUrl) {
+          if (!enabled) {
+            return;
+          }
+
+          if (signal.isFocused) {
+            focusChangeSequence++;
+            recordBrowserFocusChange(true);
+          }
+
+          if (!signal.isFocused || signalUrl !== previousUrl) {
             return;
           }
 
@@ -550,6 +739,11 @@ chrome.runtime.onMessage.addListener(
         break;
       }
 
+      case "RECOMMENDATION_OVERLAY_DISMISSED": {
+        activeRecommendationOverlay = null;
+        break;
+      }
+
       case "AUTH_TOKEN_READY": {
         signInBackgroundWithToken(message.token)
           .then(() => {
@@ -559,6 +753,13 @@ chrome.runtime.onMessage.addListener(
           .catch((error) => {
             console.warn("[Moodi] Could not sign in background auth.", error);
           });
+        break;
+      }
+
+      case "SIGN_OUT_BACKGROUND_AUTH": {
+        signOutBackgroundAuth().catch((error) => {
+          console.warn("[Moodi] Could not sign out background auth.", error);
+        });
         break;
       }
 
@@ -599,4 +800,4 @@ updateOpenTabCount();
 restoreIdleSignalState();
 seedBrowserFocusState();
 initializeSessionIdentity().then(seedActiveTab);
-console.log("[MindExt] Service worker started.");
+console.log("[Moodi] Service worker started.");
